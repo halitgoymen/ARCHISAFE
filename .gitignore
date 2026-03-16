@@ -1,1 +1,7 @@
 PPE/
+runs/
+models/
+*.pt
+comparison_results.csv
+.env
+__pycache__/
