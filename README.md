@@ -11,19 +11,20 @@ ARCHISAFE, endüstriyel ortamlarda iş güvenliğini artırmak amacıyla gelişt
   - Sınıflandırma ve etiketleme standartlarının belirlenmesi.
   - İlk test görselleri üzerinde temel model denemelerinin yapılması.
 
-### 2. Hafta: Model Karşılaştırma ve Benchmark Çalışmaları
-- **Odak Noktası:** Farklı YOLO sürümlerinin (v8, v11, v12, v26) performanslarını aynı veri seti üzerinde test etmek.
+### 2. Hafta: Model Karşılaştırma ve Teknik Analiz
+- **Odak Noktası:** Farklı YOLO sürümlerinin (v8, v11, v12, v26) benchmark testleri ve en uygun modelin seçimi.
 - **Yapılanlar:**
-  - `train_comparison.py` otomasyon script'i geliştirildi.
-  - RTX 5070 Ti GPU ortamında Nano, Small ve Medium modeller için benchmark testleri yapıldı.
-  - Eğitim süreleri ve mAP50 skorları kaydedildi.
+  - `train_comparison.py` ile RTX 5070 Ti üzerinde otomatik benchmark testleri yapıldı.
+  - mAP50 skorları ve eğitim süreleri analiz edildi.
+  - [Karşılaştırma Raporu](comparison_report.md) oluşturularak **YOLO12-Small** modelinin final seçim olduğu teknik detaylarla açıklandı.
+  - Proje yapısı temizlenerek GitHub entegrasyonu sağlandı.
 
-### 3. Hafta: Teknik Analiz ve Model Seçimi
-- **Odak Noktası:** Elde edilen verilerin profesyonel bir raporla analiz edilmesi ve final model kararı.
-- **Yapılanlar:**
-  - [Karşılaştırma Raporu](comparison_report.md) oluşturuldu.
-  - Doğruluk ve hız dengesi açısından **YOLO12-Small** modelinin proje için en uygun seçenek olduğuna karar verildi.
-  - Gereksiz runs ve model dosyaları temizlenerek projenin ana yapısı GitHub'a hazır hale getirildi.
+### 3. Hafta: Gelecek Planı (Gelecek Hafta)
+- **Odak Noktası:** Seçilen modelin canlı sisteme entegrasyonu ve saha testleri.
+- **Planlananlar:**
+  - Real-time (gerçek zamanlı) çıkarım script'lerinin yazılması.
+  - Uyarı mekanizmalarının ve bildirim sisteminin kodlanması.
+  - Sistem performansının optimize edilmesi.
 
 ## Teknik Detaylar
 
