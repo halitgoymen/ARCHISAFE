@@ -1,19 +1,37 @@
-# ARCHISAFE
+# ARCHISAFE - KKD ve Düşme Tespit Sistemi
 
-## Yapay Zeka Destekli Fabrika İş Güvenliği ve Otonom Düşme Tespit Sistemi
+ARCHISAFE, endüstriyel ortamlarda iş güvenliğini artırmak amacıyla geliştirilmiş, Yapay Zeka destekli bir görüntü işleme projesidir. Proje, çalışanların Kişisel Koruyucu Donanım (KKD) kullanımını denetler ve olası düşme vakalarını anlık olarak tespit eder.
 
-ARCHISAFE, fabrika ve endüstriyel alanlarda iş güvenliğini artırmak amacıyla geliştirilmiş, yapay zeka tabanlı bir görüntü işleme sistemidir.
+## Proje Gelişim Süreci (Haftalık)
 
-### Temel Özellikler
-- **Kişisel Koruyucu Donanım (KKD) Tespiti**: Kask, yelek, eldiven gibi güvenlik ekipmanlarının anlık kontrolü.
-- **Otonom Düşme Tespit Sistemi**: Çalışanların düşme veya kaza durumlarını gerçek zamanlı olarak algılama ve uyarı mekanizması.
-- **Çoklu Model Karşılaştırması**: En güncel YOLO modelleri (v8, v11, v12, v26) ile farklı ölçeklerde (Nano, Small, Medium) performans analizi.
+### 1. Hafta: Veri Seti Hazırlığı ve Problem Tanımı
+- **Odak Noktası:** KKD (Kask, yelek, maske vb.) ve insan duruşu (düşme tespiti) üzerine odaklanan Roboflow tabanlı veri setinin oluşturulması.
+- **Yapılanlar:** 
+  - PPE/Fall-Detection veri setinin projeye entegrasyonu.
+  - Sınıflandırma ve etiketleme standartlarının belirlenmesi.
+  - İlk test görselleri üzerinde temel model denemelerinin yapılması.
+
+### 2. Hafta: Model Karşılaştırma ve Benchmark Çalışmaları
+- **Odak Noktası:** Farklı YOLO sürümlerinin (v8, v11, v12, v26) performanslarını aynı veri seti üzerinde test etmek.
+- **Yapılanlar:**
+  - `train_comparison.py` otomasyon script'i geliştirildi.
+  - RTX 5070 Ti GPU ortamında Nano, Small ve Medium modeller için benchmark testleri yapıldı.
+  - Eğitim süreleri ve mAP50 skorları kaydedildi.
+
+### 3. Hafta: Teknik Analiz ve Model Seçimi
+- **Odak Noktası:** Elde edilen verilerin profesyonel bir raporla analiz edilmesi ve final model kararı.
+- **Yapılanlar:**
+  - [Karşılaştırma Raporu](comparison_report.md) oluşturuldu.
+  - Doğruluk ve hız dengesi açısından **YOLO12-Small** modelinin proje için en uygun seçenek olduğuna karar verildi.
+  - Gereksiz runs ve model dosyaları temizlenerek projenin ana yapısı GitHub'a hazır hale getirildi.
+
+## Teknik Detaylar
+
+### Karşılaştırma Analizi
+Eğitilen modellerin detaylı performans analizi ve derinlemesine teknik çıkarımlarına [buradan](comparison_report.md) ulaşabilirsiniz.
 
 ### Kullanım
-Modeller arası karşılaştırmalı eğitimi başlatmak için:
+Benchmark sürecini veya eğitimi tekrar başlatmak için:
 ```bash
 python train_comparison.py
 ```
-
-### Karşılaştırma Sonuçları
-Eğitilen modellerin detaylı performans analizi ve karşılaştırma sonuçlarına [buradan](comparison_report.md) ulaşabilirsiniz.
