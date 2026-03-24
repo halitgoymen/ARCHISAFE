@@ -25,7 +25,7 @@ ARCHISAFE, endüstriyel ortamlarda iş güvenliğini artırmak amacıyla gelişt
   -Proje eklenecek-çıkartılacak teknolojiler hakkında planlama.
   - Sistem performansının optimize edilmesi.
   - Veri setinde iyileştirmeler.
-  - 
+  - Modelin kararlaştırılması v12-v8.
 ### 4. Hafta: Gelecek Planı (Gelecek Hafta)
 - **Odak Noktası:** Seçilen modelin canlı sisteme entegrasyonu ve saha testleri.
 - **Planlananlar:**
