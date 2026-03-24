@@ -19,13 +19,19 @@ ARCHISAFE, endüstriyel ortamlarda iş güvenliğini artırmak amacıyla gelişt
   - [Karşılaştırma Raporu](comparison_report.md) oluşturularak **YOLO12-Small** modelinin final seçim olduğu teknik detaylarla açıklandı.
   - Proje yapısı temizlenerek GitHub entegrasyonu sağlandı.
 
-### 3. Hafta: Gelecek Planı (Gelecek Hafta)
+### 3. Hafta: Gelecek Planı 
+- **Odak Noktası:** Seçilen modelin canlı sisteme entegrasyonu ve diğer projeler ile kıyaslanması.
+- **Planlananlar:**
+  -Proje eklenecek-çıkartılacak teknolojiler hakkında planlama.
+  - Sistem performansının optimize edilmesi.
+  - Veri setinde iyileştirmeler.
+  - 
+### 4. Hafta: Gelecek Planı (Gelecek Hafta)
 - **Odak Noktası:** Seçilen modelin canlı sisteme entegrasyonu ve saha testleri.
 - **Planlananlar:**
   - Real-time (gerçek zamanlı) çıkarım script'lerinin yazılması.
   - Uyarı mekanizmalarının ve bildirim sisteminin kodlanması.
   - Sistem performansının optimize edilmesi.
-
 ## Teknik Detaylar
 
 ### Karşılaştırma Analizi
