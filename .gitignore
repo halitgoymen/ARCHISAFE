@@ -1,8 +1,9 @@
 # Veri seti (büyük, git'e gerek yok)
 PPE/
 
-# Ultralytics çıktıları
-runs/
+# Büyük arşiv dosyaları (GitHub 100MB sınırı)
+*.rar
+*.zip
 
 # Hariç tutulan ağırlık dosyaları
 *.pt
