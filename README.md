@@ -47,7 +47,39 @@ ARCHISAFE, endüstriyel ortamlarda iş güvenliğini artırmak amacıyla gelişt
   python test_live.py    # canlı kamera
   ```
 
-### 5. Hafta: Uyarı Sistemi ve Bildirimler (Gelecek Hafta)
+### 5. Hafta: Gelişmiş Model Eğitimi — YOLO26n (125 Epoch)
+- **Odak Noktası:** YOLO26n mimarisine geçiş, kapsamlı augmentation pipeline kurulumu ve 125 epoch tam eğitim.
+- **Yapılanlar:**
+  - `train_v5.py` ile YOLO26n.pt base modeli 125 epoch boyunca `RTX 5070 Ti` üzerinde eğitildi.
+  - Veri seti: PPE + Fall-Detection (12.442 eğitim, 13 sınıf).
+  - Overfit önleme: Label smoothing (0.1), weight decay (0.0005), dropout (0.1), early stopping (25 epoch sabır).
+  - Augmentation: Mosaic, MixUp, CopyPaste, RandAugment, HSV jitter, flip, perspective vb.
+  - Öğrenme oranı: LR0=0.01 → LRF=0.00005 cosine decay; 5 epoch warmup.
+  - `test_live_v5.py` ile gerçek zamanlı kamera testi desteklendi.
+- **Eğitim Sonuçları (Final — Epoch 125):**
+
+  | Metrik | Değer |
+  |--------|-------|
+  | mAP50 (en iyi, epoch 84) | **0.5885** |
+  | mAP50 (final epoch 125) | 0.5863 |
+  | mAP50-95 | 0.4032 |
+  | Precision | 0.595 |
+  | Recall | 0.669 |
+
+- **Eğitimi Başlatmak İçin:**
+  ```bash
+  cd Hafta-5/scripts
+  python train_v5.py
+  ```
+  > Eğitim 25 epoch boyunca iyileşme olmazsa **otomatik durur** (early stopping).
+
+  ```bash
+  # Bittikten sonra:
+  python test_live_v5.py    # canlı kamera testi
+  python test_live_v5.py --model Hafta-5/results/ARCHISAFE_v5/yolo26n_200ep/weights/best.pt
+  ```
+
+### 6. Hafta: Uyarı Sistemi ve Bildirimler (Gelecek Hafta)
 - **Odak Noktası:** Tespit edilen ihlallerin (kaskasız, yeleğsiz, düşme) anlık bildirime dönüştürülmesi.
 - **Planlananlar:**
   - İhlal tespit edildiğinde sesli/görsel alarm mekanizması.

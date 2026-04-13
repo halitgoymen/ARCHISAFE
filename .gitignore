@@ -1,7 +1,25 @@
+# Veri seti (büyük, git'e gerek yok)
 PPE/
+
+# Ultralytics çıktıları
 runs/
-models/
+
+# Hariç tutulan ağırlık dosyaları
 *.pt
+# Ama eğitim sonucu best/last weightlere izin ver
+!**/weights/best.pt
+!**/weights/last.pt
+
+# Base modeller (3. parti, büyük)
+yolo26n.pt
+yolo*.pt
+
+# Epoch checkpoint'leri (çok büyük, gereksiz)
+epoch*.pt
+
+# Diğer
+models/
 comparison_results.csv
 .env
 __pycache__/
+*.cache
