@@ -5,7 +5,7 @@ PPE/
 *.rar
 *.zip
 
-# Hariç tutulan ağırlık dosyaları
+# Ağırlık dosyaları — genel olarak hariç
 *.pt
 # Ama eğitim sonucu best/last weightlere izin ver
 !**/weights/best.pt
@@ -13,14 +13,22 @@ PPE/
 
 # Base modeller (3. parti, büyük)
 yolo26n.pt
+yolo12n.pt
 yolo*.pt
 
 # Epoch checkpoint'leri (çok büyük, gereksiz)
 epoch*.pt
+
+# Büyük eğitim görselleri (gereksiz)
+train_batch*.jpg
+val_batch*.jpg
+
+# Disk cache dosyaları
+*.cache
+*.npy
 
 # Diğer
 models/
 comparison_results.csv
 .env
 __pycache__/
-*.cache
