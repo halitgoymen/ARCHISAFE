@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block title %}Personel{% endblock %}
+{% block page_title %}Personel Yönetimi{% endblock %}
+{% block page_subtitle %}{{ personnel_list|length }} personel kayıtlı{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>👷 Personel Listesi</h1>
+    <p>Tüm personeli yönetin, KKD gereksinimlerini ayarlayın</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('personnel.add') }}" class="btn btn-primary">+ Yeni Personel Ekle</a>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:16px; padding:14px 16px">
+  <form method="GET" class="flex items-center gap-3 flex-wrap">
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" name="q" value="{{ search }}"
+             placeholder="Ad, ID veya görev ara…" onchange="this.form.submit()">
+    </div>
+    <select name="area" class="form-control" style="width:160px" data-auto-submit>
+      <option value="">Tüm Alanlar</option>
+      {% for a in areas %}
+        <option value="{{ a }}" {% if selected_area == a %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+    <select name="status" class="form-control" style="width:140px" data-auto-submit>
+      <option value="">Tüm Durum</option>
+      <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Aktif</option>
+      <option value="onsite" {% if selected_status == 'onsite' %}selected{% endif %}>Sahada</option>
+      <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Pasif</option>
+    </select>
+    {% if search or selected_area or selected_status %}
+      <a href="{{ url_for('personnel.index') }}" class="btn btn-outline btn-sm">✕ Temizle</a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Personnel Table -->
+<div class="card">
+  {% if personnel_list %}
+    <div class="table-wrapper">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Personel</th>
+            <th>ID</th>
+            <th>Görev</th>
+            <th>Çalışma Alanı</th>
+            <th>Zorunlu KKD</th>
+            <th>Durum</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in personnel_list %}
+            <tr>
+              <td>
+                <div class="flex items-center gap-3">
+                  <div class="personnel-avatar" style="width:38px;height:38px;font-size:15px">
+                    {% if p.photo_path %}
+                      <img src="{{ url_for('static', filename=p.photo_path) }}" alt="{{ p.full_name }}">
+                    {% else %}
+                      {{ p.first_name[0] }}{{ p.last_name[0] }}
+                    {% endif %}
+                  </div>
+                  <div>
+                    <div class="font-semi" style="font-size:13.5px">{{ p.full_name }}</div>
+                    {% if p.email %}
+                      <div class="text-xs text-muted">{{ p.email }}</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge badge-accent">{{ p.personnel_id }}</span></td>
+              <td class="text-sm">{{ p.job_title or '—' }}</td>
+              <td class="text-sm text-muted">{{ p.work_area or '—' }}</td>
+              <td>
+                <div class="flex flex-wrap gap-1" style="max-width:200px">
+                  {% for ppe in p.required_ppe %}
+                    <span class="badge badge-info" style="font-size:10px">{{ ppe }}</span>
+                  {% endfor %}
+                  {% if not p.required_ppe %}
+                    <span class="text-muted text-xs">—</span>
+                  {% endif %}
+                </div>
+              </td>
+              <td>
+                {% if not p.is_active %}
+                  <span class="badge badge-secondary">Pasif</span>
+                {% elif p.is_on_site %}
+                  <span class="badge badge-success"><span class="badge-dot"></span>Sahada</span>
+                {% else %}
+                  <span class="badge badge-warning">Dışarıda</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="flex gap-2">
+                  <a href="{{ url_for('personnel.detail', pid=p.id) }}"
+                     class="btn btn-outline btn-sm">Detay</a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">👷</div>
+      <h3>Personel Bulunamadı</h3>
+      <p>Arama kriterlerinizi değiştirin veya yeni personel ekleyin.</p>
+      <a href="{{ url_for('personnel.add') }}" class="btn btn-primary" style="margin-top:12px">+ Personel Ekle</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

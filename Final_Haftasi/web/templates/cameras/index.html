@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% block title %}Kamera Yönetimi{% endblock %}
+{% block page_title %}Kamera Yönetimi{% endblock %}
+{% block page_subtitle %}{{ cameras|length }} kamera tanımlı{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>📹 Kamera Listesi</h1>
+    <p>Kamera ekle, düzenle ve canlı akışları izle</p>
+  </div>
+  <div class="page-header-actions">
+    <button class="btn btn-primary" onclick="openModal('add-camera-modal')">+ Kamera Ekle</button>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="grid grid-4" style="margin-bottom:20px">
+  <div class="stat-card success" style="padding:14px">
+    <div class="stat-icon" style="width:36px;height:36px;font-size:16px">✅</div>
+    <div class="stat-value" style="font-size:22px">{{ cameras | selectattr('is_active') | list | length }}</div>
+    <div class="stat-label">Aktif</div>
+  </div>
+  <div class="stat-card secondary" style="padding:14px">
+    <div class="stat-icon" style="width:36px;height:36px;font-size:16px">📹</div>
+    <div class="stat-value" style="font-size:22px">{{ cameras | length }}</div>
+    <div class="stat-label">Toplam</div>
+  </div>
+  <div class="stat-card info" style="padding:14px">
+    <div class="stat-icon" style="width:36px;height:36px;font-size:16px">🚨</div>
+    <div class="stat-value" style="font-size:22px">{{ cameras | selectattr('camera_type', 'equalto', 'fall_detection') | list | length }}</div>
+    <div class="stat-label">Düşme Tespiti</div>
+  </div>
+  <div class="stat-card warning" style="padding:14px">
+    <div class="stat-icon" style="width:36px;height:36px;font-size:16px">🦺</div>
+    <div class="stat-value" style="font-size:22px">{{ cameras | selectattr('camera_type', 'equalto', 'ppe') | list | length }}</div>
+    <div class="stat-label">KKD Kontrol</div>
+  </div>
+</div>
+
+<!-- Camera grid -->
+{% if cameras %}
+  <div class="camera-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px,1fr))">
+    {% for cam in cameras %}
+      <div class="camera-card">
+        <div class="camera-feed" style="aspect-ratio:16/9">
+          {% if cam.is_active %}
+            <img src="{{ url_for('cameras.stream', cid=cam.id) }}"
+                 alt="{{ cam.name }}"
+                 onerror="this.src='https://placehold.co/640x360/0a0d14/374151?text=Sinyal+Yok'"
+                 loading="lazy" id="feed-{{ cam.id }}">
+          {% else %}
+            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#0a0d14;flex-direction:column;gap:8px">
+              <span style="font-size:32px;opacity:.3">📹</span>
+              <span style="font-size:12px;color:var(--text-muted)">Kamera Pasif</span>
+            </div>
+          {% endif %}
+          <div class="feed-badge">
+            {% if cam.is_active %}
+              <span class="badge badge-danger" style="font-size:10px"><span class="badge-dot"></span> CANLI</span>
+            {% else %}
+              <span class="badge badge-secondary" style="font-size:10px">PASİF</span>
+            {% endif %}
+            <span class="badge {{ cam.type_badge_class }}" style="font-size:10px">{{ cam.type_label }}</span>
+          </div>
+          <div class="cam-label">{{ cam.name }}</div>
+        </div>
+        <div class="camera-info">
+          <div>
+            <div class="cam-name">
+              <span class="status-dot {% if cam.is_active %}online{% else %}offline{% endif %}"></span>
+              {{ cam.camera_id }}
+            </div>
+            <div class="cam-loc">{{ cam.location or 'Konum belirtilmemiş' }}</div>
+          </div>
+          <div class="cam-actions">
+            {% if cam.is_active %}
+              <a href="{{ url_for('cameras.live', cid=cam.id) }}"
+                 class="btn btn-primary btn-sm" title="Canlı İzle">▶</a>
+            {% endif %}
+            <button class="btn btn-outline btn-sm" onclick="openEditModal({{ cam.id }}, '{{ cam.name }}', '{{ cam.location or '' }}', '{{ cam.stream_url }}', '{{ cam.camera_type }}', '{{ cam.resolution }}', {{ cam.fps }})">
+              ✏️
+            </button>
+            <form method="POST" action="{{ url_for('cameras.delete', cid=cam.id) }}" style="display:inline">
+              <button class="btn btn-danger btn-sm"
+                      data-confirm="'{{ cam.name }}' kamerası silinsin mi?"
+                      title="Sil">🗑</button>
+            </form>
+          </div>
+        </div>
+        {% if cam.camera_type == 'fall_detection' %}
+          <div style="padding:8px 14px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center">
+            <span style="font-size:12px; color:var(--text-muted); flex:1">ROI Ayarları</span>
+            <a href="{{ url_for('cameras.live', cid=cam.id) }}#roi" class="btn btn-outline btn-sm">
+              🎯 Bölge Seç
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card">
+    <div class="empty-state">
+      <div class="empty-icon">📹</div>
+      <h3>Kamera Bulunamadı</h3>
+      <p>İlk kameranızı ekleyerek başlayın.</p>
+      <button onclick="openModal('add-camera-modal')" class="btn btn-primary" style="margin-top:12px">
+        + Kamera Ekle
+      </button>
+    </div>
+  </div>
+{% endif %}
+
+<!-- Add Camera Modal -->
+<div class="modal-overlay" id="add-camera-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📹 Yeni Kamera Ekle</h3>
+      <button onclick="closeModal('add-camera-modal')" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted)">×</button>
+    </div>
+    <form method="POST" action="{{ url_for('cameras.add') }}">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Kamera Adı *</label>
+            <input type="text" name="name" class="form-control" placeholder="Giriş Kapısı" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Konum</label>
+            <input type="text" name="location" class="form-control" placeholder="Ana Giriş">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Akış Adresi *</label>
+          <input type="text" name="stream_url" class="form-control"
+                 placeholder="rtsp://192.168.1.X/stream veya 0 (webcam)" required>
+          <div class="text-xs text-muted" style="margin-top:4px">
+            RTSP adresi (IP kamera) ya da cihaz indeksi (0, 1…)
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Kamera Tipi</label>
+            <select name="camera_type" class="form-control">
+              <option value="general">Genel İzleme</option>
+              <option value="entry">Giriş Noktası</option>
+              <option value="ppe">KKD Kontrol</option>
+              <option value="fall_detection">Düşme Tespiti</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Çözünürlük</label>
+            <select name="resolution" class="form-control">
+              <option value="1280x720">1280×720 (HD)</option>
+              <option value="1920x1080">1920×1080 (Full HD)</option>
+              <option value="640x480">640×480 (VGA)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notlar</label>
+          <textarea name="notes" class="form-control" rows="2" placeholder="Opsiyonel notlar…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="closeModal('add-camera-modal')" class="btn btn-secondary">İptal</button>
+        <button type="submit" class="btn btn-primary">Kamera Ekle</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Camera Modal -->
+<div class="modal-overlay" id="edit-camera-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>✏️ Kamera Düzenle</h3>
+      <button onclick="closeModal('edit-camera-modal')" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted)">×</button>
+    </div>
+    <form method="POST" id="edit-camera-form">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Kamera Adı *</label>
+            <input type="text" name="name" id="edit-cam-name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Konum</label>
+            <input type="text" name="location" id="edit-cam-loc" class="form-control">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Akış Adresi *</label>
+          <input type="text" name="stream_url" id="edit-cam-url" class="form-control" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Kamera Tipi</label>
+            <select name="camera_type" id="edit-cam-type" class="form-control">
+              <option value="general">Genel İzleme</option>
+              <option value="entry">Giriş Noktası</option>
+              <option value="ppe">KKD Kontrol</option>
+              <option value="fall_detection">Düşme Tespiti</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Çözünürlük</label>
+            <select name="resolution" id="edit-cam-res" class="form-control">
+              <option value="1280x720">1280×720 (HD)</option>
+              <option value="1920x1080">1920×1080 (Full HD)</option>
+              <option value="640x480">640×480 (VGA)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="closeModal('edit-camera-modal')" class="btn btn-secondary">İptal</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openEditModal(id, name, location, url, type, res, fps) {
+  document.getElementById('edit-camera-form').action = `/cameras/${id}/edit`;
+  document.getElementById('edit-cam-name').value = name;
+  document.getElementById('edit-cam-loc').value = location;
+  document.getElementById('edit-cam-url').value = url;
+  document.getElementById('edit-cam-type').value = type;
+  document.getElementById('edit-cam-res').value = res;
+  openModal('edit-camera-modal');
+}
+</script>
+{% endblock %}

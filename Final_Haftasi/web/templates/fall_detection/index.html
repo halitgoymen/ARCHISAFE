@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+{% block title %}Düşme Tespiti{% endblock %}
+{% block page_title %}Düşme Tespiti{% endblock %}
+{% block page_subtitle %}Fall Detection yönetim paneli{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>🚨 Düşme Tespiti Paneli</h1>
+    <p>YOLOv12 tabanlı gerçek zamanlı düşme algılama</p>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-3" style="margin-bottom:20px">
+  <div class="stat-card danger">
+    <div class="stat-icon">🚨</div>
+    <div class="stat-value">{{ stats.total_unresolved }}</div>
+    <div class="stat-label">Açık Olaylar</div>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-icon">📅</div>
+    <div class="stat-value">{{ stats.today_count }}</div>
+    <div class="stat-label">Bugünkü Olay</div>
+  </div>
+  <div class="stat-card info">
+    <div class="stat-icon">📊</div>
+    <div class="stat-value">{{ stats.this_week }}</div>
+    <div class="stat-label">Bu Haftaki</div>
+  </div>
+</div>
+
+<!-- Active fall alarms -->
+{% set active_falls = events.items | selectattr('is_resolved', 'equalto', False) | list %}
+{% if active_falls %}
+  <div style="margin-bottom:20px">
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px">
+      <span style="color:var(--danger); font-weight:700; font-size:15px; animation:blink 1s infinite">🚨 AKTİF ALARMLAR ({{ active_falls | length }})</span>
+    </div>
+    {% for event in active_falls[:3] %}
+      <div class="fall-alarm" style="margin-bottom:10px">
+        <div class="alarm-icon">🚨</div>
+        <div style="flex:1">
+          <div class="alarm-title">Düşme Tespit Edildi!</div>
+          <div class="alarm-detail">
+            📹 {{ event.camera.name if event.camera else 'Bilinmeyen Kamera' }} ·
+            🕐 {{ event.timestamp.strftime('%d.%m.%Y %H:%M:%S') }} ·
+            🎯 Güven: {{ '%.0f%%' % (event.confidence * 100) if event.confidence else '—' }}
+          </div>
+          {% if event.location_desc %}
+            <div class="alarm-detail">📍 {{ event.location_desc }}</div>
+          {% endif %}
+        </div>
+        <div style="display:flex; gap:8px; flex-shrink:0">
+          {% if event.image_path %}
+            <a href="{{ url_for('static', filename=event.image_path) }}" target="_blank"
+               class="btn btn-secondary btn-sm">📷</a>
+          {% endif %}
+          <form method="POST" action="{{ url_for('fall.resolve', eid=event.id) }}">
+            <input type="hidden" name="notes" value="Dashboard üzerinden çözüldü">
+            <button class="btn btn-success btn-sm">✅ Çöz</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="grid grid-3">
+
+  <!-- Camera list for fall detection -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📹 Düşme Tespiti Kameraları</div>
+    </div>
+    {% for cam in cameras %}
+      <div class="flex items-center gap-3" style="padding:10px 0; border-bottom:1px solid var(--border)">
+        <div style="width:40px;height:40px;background:var(--bg-input);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">
+          📹
+        </div>
+        <div style="flex:1; min-width:0">
+          <div class="font-semi text-sm truncate">{{ cam.name }}</div>
+          <div class="text-xs text-muted">{{ cam.camera_id }}</div>
+          {% if cam.roi_data %}
+            <div class="text-xs text-success">{{ cam.roi_data | length }} ROI bölgesi</div>
+          {% else %}
+            <div class="text-xs text-warning">ROI tanımlanmamış</div>
+          {% endif %}
+        </div>
+        <div class="flex gap-2">
+          <span class="status-dot {% if cam.is_active %}online{% else %}offline{% endif %}"></span>
+          <a href="{{ url_for('cameras.live', cid=cam.id) }}" class="btn btn-outline btn-sm">▶</a>
+        </div>
+      </div>
+    {% endfor %}
+    {% if not cameras %}
+      <div class="empty-state" style="padding:20px">
+        <div class="empty-icon">📹</div>
+        <p>Düşme tespiti kamerası tanımlanmamış</p>
+        <a href="{{ url_for('cameras.index') }}" class="btn btn-primary btn-sm" style="margin-top:8px">Kamera Ekle</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Event log -->
+  <div class="card col-span-2">
+    <div class="card-header">
+      <div class="card-title">📋 Düşme Olayı Geçmişi</div>
+    </div>
+
+    <!-- Filters -->
+    <form method="GET" class="flex gap-3 flex-wrap" style="margin-bottom:16px">
+      <select name="resolved" class="form-control" style="width:140px" data-auto-submit>
+        <option value="" {% if filter_resolved == '' %}selected{% endif %}>Tüm Kayıtlar</option>
+        <option value="0" {% if filter_resolved == '0' %}selected{% endif %}>Açık Olaylar</option>
+        <option value="1" {% if filter_resolved == '1' %}selected{% endif %}>Çözülmüş</option>
+      </select>
+      <input type="date" name="date" class="form-control" style="width:160px"
+             value="{{ filter_date }}" onchange="this.form.submit()">
+      <select name="camera_id" class="form-control" style="width:160px" data-auto-submit>
+        <option value="">Tüm Kameralar</option>
+        {% for cam in cameras %}
+          <option value="{{ cam.camera_id }}" {% if filter_camera == cam.camera_id %}selected{% endif %}>
+            {{ cam.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </form>
+
+    {% if events.items %}
+      <div class="table-wrapper">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tarih/Saat</th>
+              <th>Kamera</th>
+              <th>Konum</th>
+              <th>Güven</th>
+              <th>Medya</th>
+              <th>Durum</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for event in events.items %}
+              <tr>
+                <td class="text-muted text-sm">{{ event.id }}</td>
+                <td class="text-sm">{{ event.timestamp.strftime('%d.%m.%Y %H:%M:%S') }}</td>
+                <td class="text-sm">{{ event.camera.name if event.camera else '—' }}</td>
+                <td class="text-sm text-muted">{{ event.location_desc or '—' }}</td>
+                <td>
+                  {% if event.confidence %}
+                    <div class="progress" style="width:80px">
+                      <div class="progress-bar {% if event.confidence > 0.7 %}danger{% elif event.confidence > 0.5 %}warning{% else %}success{% endif %}"
+                           style="width:{{ (event.confidence * 100)|int }}%"></div>
+                    </div>
+                    <div class="text-xs text-muted" style="margin-top:2px">{{ '%.0f%%' % (event.confidence * 100) }}</div>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="flex gap-1">
+                    {% if event.image_path %}
+                      <a href="{{ url_for('static', filename=event.image_path) }}" target="_blank"
+                         class="btn btn-outline btn-sm" title="Görüntü">📷</a>
+                    {% endif %}
+                    {% if event.video_path %}
+                      <a href="{{ url_for('static', filename=event.video_path) }}" target="_blank"
+                         class="btn btn-outline btn-sm" title="Video">🎬</a>
+                    {% endif %}
+                  </div>
+                </td>
+                <td>
+                  {% if event.is_resolved %}
+                    <span class="badge badge-success">✓ Çözüldü</span>
+                  {% else %}
+                    <span class="badge badge-danger" style="animation:pulse 2s infinite">🚨 Açık</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if not event.is_resolved %}
+                    <button class="btn btn-success btn-sm" onclick="openResolveModal({{ event.id }})">Çöz</button>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if events.pages > 1 %}
+        <div class="pagination">
+          {% if events.has_prev %}
+            <a href="{{ url_for('fall.index', page=events.prev_num, resolved=filter_resolved) }}" class="page-link">«</a>
+          {% endif %}
+          {% for pg in events.iter_pages() %}
+            {% if pg %}
+              <a href="{{ url_for('fall.index', page=pg, resolved=filter_resolved) }}"
+                 class="page-link {% if pg == events.page %}active{% endif %}">{{ pg }}</a>
+            {% endif %}
+          {% endfor %}
+          {% if events.has_next %}
+            <a href="{{ url_for('fall.index', page=events.next_num, resolved=filter_resolved) }}" class="page-link">»</a>
+          {% endif %}
+        </div>
+      {% endif %}
+
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">✅</div>
+        <h3>Düşme Olayı Bulunamadı</h3>
+        <p>Seçilen kriterlerde kayıt yok.</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Resolve Modal -->
+<div class="modal-overlay" id="resolve-modal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h3>✅ Olayı Çöz</h3>
+      <button onclick="closeModal('resolve-modal')" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted)">×</button>
+    </div>
+    <form method="POST" id="resolve-form">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Çözüm Notu</label>
+          <textarea name="notes" class="form-control" rows="3"
+                    placeholder="Olayla ilgili notunuzu girin…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="closeModal('resolve-modal')" class="btn btn-secondary">İptal</button>
+        <button type="submit" class="btn btn-success">✅ Çözüldü Olarak İşaretle</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openResolveModal(eventId) {
+  document.getElementById('resolve-form').action = `/fall-detection/${eventId}/resolve`;
+  openModal('resolve-modal');
+}
+
+// Auto-reload on new fall event
+if (socket) {
+  socket.on('fall_alert', () => {
+    setTimeout(() => location.reload(), 2000);
+  });
+}
+</script>
+{% endblock %}

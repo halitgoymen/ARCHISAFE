@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Gerçek zamanlı saha izleme{% endblock %}
+
+{% block content %}
+
+<!-- ── Stat Cards ──────────────────────────────────────── -->
+<div class="grid grid-5" style="margin-bottom:20px">
+
+  <div class="stat-card accent">
+    <div class="stat-icon">👷</div>
+    <div class="stat-value" id="stat-active_personnel">{{ stats.active_personnel }}</div>
+    <div class="stat-label">Sahadaki Personel</div>
+  </div>
+
+  <div class="stat-card success">
+    <div class="stat-icon">🚪</div>
+    <div class="stat-value" id="stat-today_entries">{{ stats.today_entries }}</div>
+    <div class="stat-label">Bugünkü Giriş</div>
+  </div>
+
+  <div class="stat-card warning">
+    <div class="stat-icon">🦺</div>
+    <div class="stat-value" id="stat-ppe_warnings">{{ stats.ppe_warnings }}</div>
+    <div class="stat-label">KKD Uyarısı</div>
+  </div>
+
+  <div class="stat-card danger">
+    <div class="stat-icon">🚨</div>
+    <div class="stat-value" id="stat-fall_events_today">{{ stats.fall_events_today }}</div>
+    <div class="stat-label">Düşme (Bugün)</div>
+  </div>
+
+  <div class="stat-card info">
+    <div class="stat-icon">📹</div>
+    <div class="stat-value">{{ stats.active_cameras }}<span style="font-size:14px;color:var(--text-muted)">/{{ stats.total_cameras }}</span></div>
+    <div class="stat-label">Aktif Kamera</div>
+  </div>
+
+</div>
+
+<!-- ── Row 2: Charts + Alerts ─────────────────────────── -->
+<div class="grid grid-3" style="margin-bottom:20px">
+
+  <!-- Weekly entry chart -->
+  <div class="card col-span-2">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Haftalık Personel Giriş İstatistikleri</div>
+        <div class="card-subtitle">Son 7 günlük giriş sayısı</div>
+      </div>
+    </div>
+    <div class="chart-container" style="height:200px">
+      <canvas id="weeklyChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Active alerts -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Aktif Alarmlar</div>
+      {% if stats.unread_alerts > 0 %}
+        <span class="badge badge-danger">{{ stats.unread_alerts }}</span>
+      {% endif %}
+    </div>
+    {% if recent_falls %}
+      {% for fall in recent_falls %}
+        <div class="fall-alarm" style="margin-bottom:8px">
+          <div class="alarm-icon">🚨</div>
+          <div>
+            <div class="alarm-title">Düşme Tespit Edildi</div>
+            <div class="alarm-detail">
+              {{ fall.camera.name if fall.camera else 'Kamera' }} —
+              {{ fall.timestamp.strftime('%H:%M') }}
+            </div>
+          </div>
+          <a href="{{ url_for('fall.index') }}"
+             class="btn btn-danger btn-sm" style="margin-left:auto">İncele</a>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state" style="padding:24px">
+        <div class="empty-icon">✅</div>
+        <p>Aktif alarm yok</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- ── Row 3: Live Cameras + PPE Status ───────────────── -->
+<div class="grid grid-3" style="margin-bottom:20px">
+
+  <!-- Live cameras -->
+  <div class="card col-span-2">
+    <div class="card-header">
+      <div class="card-title">📹 Canlı Kamera Görüntüleri</div>
+      <a href="{{ url_for('cameras.index') }}" class="btn btn-outline btn-sm">Tümünü Gör</a>
+    </div>
+    {% if cameras %}
+      <div class="camera-grid">
+        {% for cam in cameras[:4] %}
+          <div class="camera-card">
+            <div class="camera-feed">
+              <img src="{{ url_for('cameras.stream', cid=cam.id) }}"
+                   alt="{{ cam.name }}"
+                   onerror="this.src='https://placehold.co/640x360/111827/4b5563?text=Sinyal+Yok'"
+                   loading="lazy">
+              <div class="feed-badge">
+                <span class="badge badge-danger" style="font-size:10px">
+                  <span class="badge-dot"></span> CANLI
+                </span>
+                <span class="badge badge-secondary" style="font-size:10px">{{ cam.type_label }}</span>
+              </div>
+              <div class="cam-label">{{ cam.name }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">📹</div>
+        <h3>Kamera Bulunamadı</h3>
+        <p>Kamera eklemek için Kamera Yönetimi sayfasına gidin.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- PPE status + recent violations -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🦺 KKD Durumu</div>
+      <a href="{{ url_for('ppe.index') }}" class="btn btn-outline btn-sm">Tümü</a>
+    </div>
+    <div id="ppe-status-list">
+      {% if recent_violations %}
+        {% for v in recent_violations[:6] %}
+          <div class="flex items-start gap-3" style="padding:10px 0; border-bottom:1px solid var(--border)">
+            <div style="width:36px; height:36px; border-radius:50%; background:var(--warning-bg); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0">
+              ⚠️
+            </div>
+            <div style="flex:1; min-width:0">
+              <div class="truncate font-semi text-sm">
+                {{ v.personnel.full_name if v.personnel else 'Bilinmeyen' }}
+              </div>
+              <div class="text-xs text-muted">{{ v.timestamp.strftime('%H:%M') }}</div>
+              <div class="ppe-status-row mt-1">
+                {% for item in v.missing_ppe %}
+                  <span class="ppe-item missing">✗ {{ item }}</span>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state" style="padding:24px">
+          <div class="empty-icon">🦺</div>
+          <p>KKD ihlali yok</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Row 4: Recent entries + Security timeline ───────── -->
+<div class="grid grid-2">
+
+  <!-- Recent entries -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🚪 Son Personel Girişleri</div>
+      <a href="{{ url_for('personnel.index') }}" class="btn btn-outline btn-sm">Tümü</a>
+    </div>
+    {% if recent_entries %}
+      <div class="table-wrapper">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Personel</th>
+              <th>Giriş Saati</th>
+              <th>Durum</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in recent_entries %}
+              <tr>
+                <td>
+                  <div class="flex items-center gap-2">
+                    <div class="personnel-avatar" style="width:30px;height:30px;font-size:13px">
+                      {% if log.personnel and log.personnel.photo_path %}
+                        <img src="{{ url_for('static', filename=log.personnel.photo_path) }}" alt="">
+                      {% else %}
+                        {{ log.personnel.first_name[0] if log.personnel else '?' }}
+                      {% endif %}
+                    </div>
+                    <div>
+                      <div class="text-sm font-semi">{{ log.personnel.full_name if log.personnel else '—' }}</div>
+                      <div class="text-xs text-muted">{{ log.personnel.personnel_id if log.personnel else '' }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="text-sm">{{ log.entry_time.strftime('%H:%M:%S') }}</td>
+                <td>
+                  {% if log.is_open %}
+                    <span class="badge badge-success"><span class="badge-dot"></span>Sahada</span>
+                  {% else %}
+                    <span class="badge badge-secondary">Çıkış Yaptı</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">🚪</div>
+        <p>Bugün henüz giriş yapılmadı</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Security timeline -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🛡️ Güvenlik Olayları Zaman Çizelgesi</div>
+    </div>
+    <div class="timeline">
+      {% set all_events = [] %}
+      {% for v in recent_violations[:4] %}
+        {% set _ = all_events.append({'type': 'ppe', 'time': v.timestamp, 'obj': v}) %}
+      {% endfor %}
+      {% for f in recent_falls[:3] %}
+        {% set _ = all_events.append({'type': 'fall', 'time': f.timestamp, 'obj': f}) %}
+      {% endfor %}
+
+      {% if all_events %}
+        {% for ev in all_events | sort(attribute='time', reverse=True) %}
+          {% if ev.type == 'fall' %}
+            <div class="timeline-item danger">
+              <div class="timeline-time">{{ ev.time.strftime('%d.%m.%Y %H:%M') }}</div>
+              <div class="timeline-title">🚨 Düşme Tespit Edildi</div>
+              <div class="timeline-desc">{{ ev.obj.camera.name if ev.obj.camera else 'Kamera' }}</div>
+            </div>
+          {% else %}
+            <div class="timeline-item warning">
+              <div class="timeline-time">{{ ev.time.strftime('%d.%m.%Y %H:%M') }}</div>
+              <div class="timeline-title">⚠️ KKD İhlali</div>
+              <div class="timeline-desc">
+                {{ ev.obj.personnel.full_name if ev.obj.personnel else 'Bilinmeyen' }} —
+                Eksik: {{ ev.obj.missing_ppe | join(', ') }}
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        <div class="empty-state" style="padding:24px">
+          <div class="empty-icon">🛡️</div>
+          <p>Güvenlik olayı kaydı yok</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Weekly chart
+const ctx = document.getElementById('weeklyChart');
+if (ctx) {
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: {{ week_labels | tojson }},
+      datasets: [{
+        label: 'Giriş Sayısı',
+        data: {{ week_data | tojson }},
+        backgroundColor: 'rgba(59,130,246,.4)',
+        borderColor: 'rgba(59,130,246,1)',
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#9ca3af' } },
+        y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#9ca3af', stepSize: 1 }, min: 0 }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

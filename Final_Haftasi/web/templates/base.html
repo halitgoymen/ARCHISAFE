@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ARCHISAFE{% endblock %} — İnşaat Güvenlik Sistemi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- Flash messages (processed by JS) -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="flash-message" data-category="{{ cat }}" style="display:none">{{ msg }}</div>
+  {% endfor %}
+{% endwith %}
+
+<div class="app-wrapper">
+
+  <!-- ── Sidebar ───────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🏗️</div>
+      <div>
+        <div class="logo-text">ARCHISAFE</div>
+        <div class="logo-sub">Güvenlik Yönetim Sistemi</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Genel</div>
+
+      <a href="{{ url_for('dashboard.index') }}"
+         class="nav-item {% if request.endpoint == 'dashboard.index' %}active{% endif %}">
+        <span class="nav-icon">📊</span>
+        <span>Dashboard</span>
+        {% set unread = unread_alerts_count if unread_alerts_count is defined else 0 %}
+        {% if unread > 0 %}
+          <span class="nav-badge">{{ unread }}</span>
+        {% endif %}
+      </a>
+
+      <div class="nav-section-title">İzleme</div>
+
+      <a href="{{ url_for('cameras.index') }}"
+         class="nav-item {% if 'cameras' in request.endpoint %}active{% endif %}">
+        <span class="nav-icon">📹</span>
+        <span>Kamera Yönetimi</span>
+      </a>
+
+      <a href="{{ url_for('ppe.index') }}"
+         class="nav-item {% if 'ppe' in request.endpoint %}active{% endif %}">
+        <span class="nav-icon">🦺</span>
+        <span>KKD Takibi</span>
+      </a>
+
+      <a href="{{ url_for('fall.index') }}"
+         class="nav-item {% if 'fall' in request.endpoint %}active{% endif %}">
+        <span class="nav-icon">🚨</span>
+        <span>Düşme Tespiti</span>
+      </a>
+
+      <div class="nav-section-title">Yönetim</div>
+
+      <a href="{{ url_for('personnel.index') }}"
+         class="nav-item {% if 'personnel' in request.endpoint %}active{% endif %}">
+        <span class="nav-icon">👷</span>
+        <span>Personel</span>
+      </a>
+
+      <a href="{{ url_for('reports.index') }}"
+         class="nav-item {% if 'reports' in request.endpoint %}active{% endif %}">
+        <span class="nav-icon">📈</span>
+        <span>Raporlar</span>
+      </a>
+
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user" data-dropdown="user-dropdown">
+        <div class="user-avatar">
+          {{ current_user.full_name[0] if current_user.full_name else 'A' }}
+        </div>
+        <div>
+          <div class="user-name">{{ current_user.full_name or current_user.username }}</div>
+          <div class="user-role">{{ current_user.role|title }}</div>
+        </div>
+      </div>
+      <div class="dropdown-menu" id="user-dropdown">
+        <a href="{{ url_for('auth.profile') }}" class="dropdown-item">👤 Profil</a>
+        <div class="dropdown-divider"></div>
+        <a href="{{ url_for('auth.logout') }}" class="dropdown-item text-danger">🚪 Çıkış Yap</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ──────────────────────────────────────────── -->
+  <div class="main-content">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <button class="topbar-btn" id="sidebar-toggle" title="Menü">☰</button>
+      <div style="flex:1">
+        <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
+        <div class="topbar-subtitle">{% block page_subtitle %}{% endblock %}</div>
+      </div>
+      <div class="topbar-actions">
+        <!-- Alert bell -->
+        <div class="dropdown">
+          <button class="topbar-btn" data-dropdown="notif-dropdown" title="Bildirimler">
+            🔔
+            <span class="badge-dot" id="notif-dot"></span>
+          </button>
+          <div class="dropdown-menu" id="notif-dropdown" style="width:340px">
+            <div style="padding:12px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+              <span style="font-weight:600; font-size:13px;">Bildirimler</span>
+              <button onclick="markAllRead()" style="background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;">Tümünü Okundu İşaretle</button>
+            </div>
+            <div id="notif-list" style="max-height:320px; overflow-y:auto;">
+              <div class="empty-state" style="padding:24px">
+                <div>🔔</div>
+                <div style="margin-top:6px; font-size:13px;">Yeni bildirim yok</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Current time -->
+        <div style="font-size:12px; color:var(--text-muted); text-align:right; min-width:80px">
+          <div id="clock-time" style="font-weight:600; font-size:14px"></div>
+          <div id="clock-date"></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="page-content">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div><!-- /main-content -->
+</div><!-- /app-wrapper -->
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- Socket.IO -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<!-- Main JS -->
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+<script>
+// Clock
+function updateClock() {
+  const now = new Date();
+  const te = document.getElementById('clock-time');
+  const de = document.getElementById('clock-date');
+  if (te) te.textContent = now.toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  if (de) de.textContent = now.toLocaleDateString('tr-TR', {day:'numeric',month:'short',year:'numeric'});
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// Notification loader
+async function loadNotifications() {
+  try {
+    const res = await fetch('/api/alerts/unread');
+    const alerts = await res.json();
+    const list = document.getElementById('notif-list');
+    const dot  = document.getElementById('notif-dot');
+    if (!list) return;
+    dot.style.display = alerts.length > 0 ? 'block' : 'none';
+    if (alerts.length === 0) {
+      list.innerHTML = '<div class="empty-state" style="padding:24px"><div>🔔</div><div style="margin-top:6px;font-size:13px;">Yeni bildirim yok</div></div>';
+      return;
+    }
+    list.innerHTML = alerts.map(a => `
+      <div class="dropdown-item" style="flex-direction:column; align-items:flex-start; gap:2px; padding:12px 14px; border-bottom:1px solid var(--border)">
+        <div style="display:flex; align-items:center; gap:6px; width:100%">
+          <span>${a.severity==='critical'?'🚨':a.severity==='high'?'⚠️':'ℹ️'}</span>
+          <span style="font-weight:600; font-size:13px; flex:1">${escHtml(a.title)}</span>
+          <span style="font-size:11px; color:var(--text-muted)">${escHtml(a.time_ago)}</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-left:22px">${escHtml(a.message)}</div>
+      </div>
+    `).join('');
+  } catch (_) {}
+}
+loadNotifications();
+setInterval(loadNotifications, 15000);
+
+async function markAllRead() {
+  await fetch('/api/alerts/read-all', {method:'POST'});
+  loadNotifications();
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

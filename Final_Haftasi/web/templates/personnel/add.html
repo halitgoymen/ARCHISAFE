@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}Personel Ekle{% endblock %}
+{% block page_title %}Personel Ekle{% endblock %}
+{% block page_subtitle %}Yeni personel kaydı oluştur{% endblock %}
+
+{% block content %}
+<div style="max-width:760px">
+  <div class="page-header">
+    <div>
+      <h1>👷 Yeni Personel Ekle</h1>
+      <p>Bir sonraki ID: <strong>{{ next_id }}</strong></p>
+    </div>
+    <a href="{{ url_for('personnel.index') }}" class="btn btn-secondary">← Geri</a>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data">
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><div class="card-title">Kişisel Bilgiler</div></div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Ad *</label>
+          <input type="text" name="first_name" class="form-control" placeholder="Ahmet" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Soyad *</label>
+          <input type="text" name="last_name" class="form-control" placeholder="Yılmaz" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Görev / Pozisyon</label>
+          <input type="text" name="job_title" class="form-control" placeholder="İşçi, Ustabaşı, Mühendis…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Çalışma Alanı</label>
+          <input type="text" name="work_area" class="form-control" placeholder="A Blok, İskele, Depo…">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Telefon</label>
+          <input type="tel" name="phone" class="form-control" placeholder="05XX XXX XX XX">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-posta</label>
+          <input type="email" name="email" class="form-control" placeholder="ornek@firma.com">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><div class="card-title">Fotoğraf & Yüz Tanıma</div></div>
+
+      <div class="flex gap-4 items-start">
+        <div style="flex-shrink:0">
+          <div class="personnel-avatar" style="width:100px; height:100px; font-size:36px; border-radius:12px" id="photo-preview">
+            👤
+          </div>
+        </div>
+        <div style="flex:1">
+          <div class="form-group">
+            <label class="form-label">Personel Fotoğrafı</label>
+            <input type="file" name="photo" class="form-control" accept="image/*"
+                   data-preview="photo-img-preview">
+          </div>
+          <div class="alert alert-info" style="font-size:12px">
+            <span>ℹ️</span>
+            <span class="alert-msg">Yüklenen fotoğraftan otomatik olarak yüz kodlaması oluşturulur. Yüz tanıma ile giriş için net bir yüz fotoğrafı yükleyin.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <div class="card-title">Zorunlu KKD Ekipmanları</div>
+        <div class="card-subtitle">Personelin bulunduğu alanda takması gereken ekipmanlar</div>
+      </div>
+
+      <div class="ppe-grid">
+        {% for value, label in ppe_options %}
+          <label class="ppe-checkbox">
+            <input type="checkbox" name="required_ppe" value="{{ value }}" checked>
+            <span>{{ label }}</span>
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="flex gap-3 justify-between">
+      <a href="{{ url_for('personnel.index') }}" class="btn btn-secondary">İptal</a>
+      <button type="submit" class="btn btn-primary btn-lg">✅ Personeli Kaydet</button>
+    </div>
+  </form>
+</div>
+
+<img id="photo-img-preview" src="" style="display:none">
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelector('input[name="photo"]').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const preview = document.getElementById('photo-preview');
+      preview.innerHTML = `<img src="${ev.target.result}" alt="Fotoğraf" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`;
+    };
+    reader.readAsDataURL(file);
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+{% block title %}Canlı: {{ camera.name }}{% endblock %}
+{% block page_title %}{{ camera.name }}{% endblock %}
+{% block page_subtitle %}Canlı kamera görüntüsü · {{ camera.location }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.live-container { display:grid; grid-template-columns:1fr 340px; gap:16px; height:calc(100vh - 140px); }
+.live-feed      { background:#000; border-radius:var(--radius-lg); overflow:hidden; position:relative; }
+.live-feed img  { width:100%; height:100%; object-fit:contain; }
+.live-sidebar   { display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
+.roi-panel      { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>📹 {{ camera.name }}</h1>
+    <p>{{ camera.camera_id }} · {{ camera.type_label }} · {{ camera.location }}</p>
+  </div>
+  <div class="page-header-actions">
+    <span class="badge badge-danger"><span class="badge-dot"></span> CANLI</span>
+    <a href="{{ url_for('cameras.index') }}" class="btn btn-secondary">← Geri</a>
+  </div>
+</div>
+
+<div class="live-container">
+  <!-- Main feed -->
+  <div class="live-feed" id="feed-container">
+    <img src="{{ url_for('cameras.stream', cid=camera.id) }}"
+         alt="Canlı Görüntü"
+         onerror="this.src='https://placehold.co/1280x720/0a0d14/374151?text=Sinyal+Yok'"
+         id="live-img">
+    <!-- ROI canvas overlay -->
+    {% if camera.camera_type == 'fall_detection' %}
+      <canvas id="roi-canvas" class="roi-canvas" id="roi-canvas"></canvas>
+    {% endif %}
+    <!-- Live badges -->
+    <div style="position:absolute; top:12px; left:12px; display:flex; gap:6px">
+      <span class="badge badge-danger" style="font-size:11px"><span class="badge-dot"></span> CANLI</span>
+      <span class="badge badge-secondary" style="font-size:11px" id="fps-badge">-- FPS</span>
+    </div>
+    <div style="position:absolute; top:12px; right:12px">
+      <button onclick="toggleFullscreen()" class="btn btn-secondary btn-sm">⛶ Tam Ekran</button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="live-sidebar">
+
+    <!-- Camera info -->
+    <div class="roi-panel">
+      <div class="card-title" style="margin-bottom:12px">📷 Kamera Bilgileri</div>
+      <div style="font-size:12.5px; display:flex; flex-direction:column; gap:6px">
+        <div class="flex justify-between"><span class="text-muted">ID:</span><span>{{ camera.camera_id }}</span></div>
+        <div class="flex justify-between"><span class="text-muted">Tip:</span>
+          <span class="badge {{ camera.type_badge_class }}" style="font-size:10px">{{ camera.type_label }}</span>
+        </div>
+        <div class="flex justify-between"><span class="text-muted">Çözünürlük:</span><span>{{ camera.resolution }}</span></div>
+        <div class="flex justify-between"><span class="text-muted">FPS:</span><span>{{ camera.fps }}</span></div>
+      </div>
+    </div>
+
+    {% if camera.camera_type == 'fall_detection' %}
+    <!-- ROI Panel -->
+    <div class="roi-panel">
+      <div class="card-title" style="margin-bottom:8px">🎯 ROI (İlgi Bölgesi)</div>
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px">
+        Düşme tespitinin yapılmasını istediğiniz alanı çizin.
+      </p>
+      <div class="flex gap-2" style="flex-wrap:wrap">
+        <button onclick="startDrawing()" class="btn btn-primary btn-sm" id="draw-btn">✏️ Çiz</button>
+        <button onclick="clearROI()" class="btn btn-secondary btn-sm">🗑 Temizle</button>
+        <button onclick="saveROI()" class="btn btn-success btn-sm">💾 Kaydet</button>
+      </div>
+      <div id="roi-status" style="margin-top:8px; font-size:12px; color:var(--text-muted)">
+        {% if camera.roi_data %}
+          {{ camera.roi_data | length }} bölge tanımlı
+        {% else %}
+          Henüz bölge tanımlanmamış
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Detection stats -->
+    <div class="roi-panel">
+      <div class="card-title" style="margin-bottom:12px">📊 Tespit İstatistikleri</div>
+      <div id="detection-stats">
+        <div class="empty-state" style="padding:16px">
+          <div style="font-size:24px; opacity:.4">📊</div>
+          <div style="font-size:12px; margin-top:4px">Canlı istatistikler yükleniyor…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent events from this camera -->
+    <div class="roi-panel" style="flex:1">
+      <div class="card-title" style="margin-bottom:12px">🕐 Son Olaylar</div>
+      <div id="recent-events">
+        <div class="text-muted text-sm">Veri yükleniyor…</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// FPS counter
+let lastTime = Date.now();
+let frameCount = 0;
+const img = document.getElementById('live-img');
+if (img) {
+  img.addEventListener('load', () => {
+    frameCount++;
+    const now = Date.now();
+    if (now - lastTime >= 1000) {
+      document.getElementById('fps-badge').textContent = frameCount + ' FPS';
+      frameCount = 0; lastTime = now;
+    }
+  });
+}
+
+// Fullscreen
+function toggleFullscreen() {
+  const el = document.getElementById('feed-container');
+  if (!document.fullscreenElement) el.requestFullscreen();
+  else document.exitFullscreen();
+}
+
+// ── ROI Drawing ──────────────────────────────────────────
+const canvas = document.getElementById('roi-canvas');
+let isDrawing = false;
+let drawMode  = false;
+let points    = [];
+let roiRegions = {{ camera.roi_data | tojson }};
+
+function resizeCanvas() {
+  if (!canvas) return;
+  const img = document.getElementById('live-img');
+  canvas.width  = img.offsetWidth;
+  canvas.height = img.offsetHeight;
+  drawAllROI();
+}
+window.addEventListener('resize', resizeCanvas);
+setTimeout(resizeCanvas, 500);
+
+function startDrawing() {
+  drawMode = true;
+  points = [];
+  if (canvas) canvas.style.cursor = 'crosshair';
+  document.getElementById('draw-btn').textContent = '⏹ Bitir';
+  document.getElementById('draw-btn').onclick = finishDrawing;
+}
+function finishDrawing() {
+  drawMode = false;
+  if (canvas) canvas.style.cursor = 'default';
+  document.getElementById('draw-btn').textContent = '✏️ Çiz';
+  document.getElementById('draw-btn').onclick = startDrawing;
+  if (points.length >= 3) roiRegions.push([...points]);
+  points = [];
+  drawAllROI();
+}
+function clearROI() { roiRegions = []; points = []; drawAllROI(); document.getElementById('roi-status').textContent = 'Temizlendi'; }
+
+function drawAllROI() {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  roiRegions.forEach((region, i) => {
+    ctx.beginPath();
+    ctx.moveTo(region[0][0], region[0][1]);
+    region.slice(1).forEach(p => ctx.lineTo(p[0], p[1]));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(239,68,68,.15)';
+    ctx.strokeStyle = 'rgba(239,68,68,.8)';
+    ctx.lineWidth = 2;
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ef4444';
+    ctx.font = '12px Inter';
+    ctx.fillText(`ROI ${i+1}`, region[0][0]+4, region[0][1]+14);
+  });
+}
+
+if (canvas) {
+  canvas.addEventListener('click', (e) => {
+    if (!drawMode) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width  * canvas.width;
+    const y = (e.clientY - rect.top)  / rect.height * canvas.height;
+    points.push([Math.round(x), Math.round(y)]);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, 2*Math.PI); ctx.fill();
+    if (points.length > 1) {
+      ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(points[0][0], points[0][1]);
+      points.slice(1).forEach(p => ctx.lineTo(p[0], p[1]));
+      ctx.stroke();
+    }
+  });
+}
+
+async function saveROI() {
+  try {
+    const res = await fetch('{{ url_for("cameras.save_roi", cid=camera.id) }}', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({roi: roiRegions})
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('low', '✅ ROI Kaydedildi', `${roiRegions.length} bölge kaydedildi.`);
+      document.getElementById('roi-status').textContent = `${roiRegions.length} bölge kaydedildi`;
+    }
+  } catch (e) { showToast('high', 'Hata', 'ROI kaydedilemedi.'); }
+}
+</script>
+{% endblock %}

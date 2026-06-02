@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+{% block title %}Raporlar{% endblock %}
+{% block page_title %}Raporlama ve İstatistikler{% endblock %}
+{% block page_subtitle %}PDF ve Excel dışa aktarma{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>📈 Raporlar</h1>
+    <p>{{ start_date.strftime('%d.%m.%Y') }} — {{ end_date.strftime('%d.%m.%Y') }}</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('reports.export_excel', type='attendance', start=start_date.isoformat(), end=end_date.isoformat()) }}"
+       class="btn btn-success">📥 Giriş Excel</a>
+    <a href="{{ url_for('reports.export_excel', type='ppe', start=start_date.isoformat(), end=end_date.isoformat()) }}"
+       class="btn btn-warning">📥 KKD Excel</a>
+    <a href="{{ url_for('reports.export_excel', type='fall', start=start_date.isoformat(), end=end_date.isoformat()) }}"
+       class="btn btn-danger">📥 Düşme Excel</a>
+  </div>
+</div>
+
+<!-- Date filter -->
+<div class="card" style="margin-bottom:20px; padding:14px 16px">
+  <form method="GET" class="flex items-center gap-3 flex-wrap">
+    <div class="flex items-center gap-2">
+      <label class="form-label" style="margin:0; white-space:nowrap">Başlangıç:</label>
+      <input type="date" name="start" class="form-control" style="width:160px"
+             value="{{ start_date.isoformat() }}">
+    </div>
+    <div class="flex items-center gap-2">
+      <label class="form-label" style="margin:0; white-space:nowrap">Bitiş:</label>
+      <input type="date" name="end" class="form-control" style="width:160px"
+             value="{{ end_date.isoformat() }}">
+    </div>
+    <button type="submit" class="btn btn-primary">🔍 Filtrele</button>
+  </form>
+</div>
+
+<!-- Summary stats -->
+<div class="grid grid-4" style="margin-bottom:20px">
+  <div class="stat-card accent"><div class="stat-icon">👷</div><div class="stat-value">{{ summary.active_personnel }}</div><div class="stat-label">Aktif Personel</div></div>
+  <div class="stat-card success"><div class="stat-icon">🚪</div><div class="stat-value">{{ summary.total_entries }}</div><div class="stat-label">Toplam Giriş</div></div>
+  <div class="stat-card warning"><div class="stat-icon">⚠️</div><div class="stat-value">{{ summary.total_ppe_violations }}</div><div class="stat-label">KKD İhlali</div></div>
+  <div class="stat-card danger"><div class="stat-icon">🚨</div><div class="stat-value">{{ summary.total_fall_events }}</div><div class="stat-label">Düşme Olayı</div></div>
+</div>
+
+<!-- Charts row -->
+<div class="grid grid-2" style="margin-bottom:20px">
+
+  <!-- Daily entry trend -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">📊 Günlük Personel Giriş Trendi</div></div>
+    <div class="chart-container" style="height:220px">
+      <canvas id="dailyEntryChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Top violators -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">⚠️ En Fazla KKD İhlali Yapan Personel</div></div>
+    {% if top_violators %}
+      {% for person, count in top_violators %}
+        <div class="flex items-center gap-3" style="padding:8px 0; border-bottom:1px solid var(--border)">
+          <div class="personnel-avatar" style="width:32px;height:32px;font-size:12px">
+            {{ person.first_name[0] }}{{ person.last_name[0] }}
+          </div>
+          <div style="flex:1; min-width:0">
+            <div class="text-sm font-semi truncate">{{ person.full_name }}</div>
+            <div class="text-xs text-muted">{{ person.personnel_id }}</div>
+          </div>
+          <div>
+            <span class="badge badge-danger">{{ count }} ihlal</span>
+          </div>
+          <div style="width:80px">
+            <div class="progress">
+              <div class="progress-bar danger"
+                   style="width:{{ [(count / (top_violators[0][1] or 1) * 100)|int, 100]|min }}%"></div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state" style="padding:24px"><p>Bu tarih aralığında ihlal yok.</p></div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Tabs: Attendance | PPE | Fall -->
+<div class="card">
+  <div style="display:flex; gap:0; border-bottom:1px solid var(--border); margin:-20px -20px 0">
+    <button class="tab-btn active" onclick="showReportTab('tab-attendance', this)"
+            style="padding:12px 20px; background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--accent); border-bottom:2px solid var(--accent)">
+      🚪 Giriş/Çıkış ({{ daily_entries | sum(attribute='count') }})
+    </button>
+    <button class="tab-btn" onclick="showReportTab('tab-ppe', this)"
+            style="padding:12px 20px; background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--text-muted); border-bottom:2px solid transparent">
+      ⚠️ KKD İhlalleri ({{ ppe_violations | length }})
+    </button>
+    <button class="tab-btn" onclick="showReportTab('tab-fall', this)"
+            style="padding:12px 20px; background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--text-muted); border-bottom:2px solid transparent">
+      🚨 Düşme Olayları ({{ fall_events | length }})
+    </button>
+  </div>
+
+  <!-- Attendance tab -->
+  <div id="tab-attendance" class="tab-panel" style="padding-top:16px">
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Tarih</th><th>Giriş Sayısı</th><th>Trend</th></tr></thead>
+        <tbody>
+          {% for entry in daily_entries | reverse %}
+            {% if entry.count > 0 %}
+              <tr>
+                <td class="text-sm">{{ entry.date }}</td>
+                <td><span class="badge badge-success">{{ entry.count }}</span></td>
+                <td style="width:200px">
+                  <div class="progress">
+                    <div class="progress-bar success"
+                         style="width:{{ [(entry.count / [(daily_entries | map(attribute='count') | max), 1] | first * 100)|int, 100]|min }}%">
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PPE tab -->
+  <div id="tab-ppe" class="tab-panel" style="display:none; padding-top:16px">
+    {% if ppe_violations %}
+      <div class="table-wrapper">
+        <table class="table">
+          <thead>
+            <tr><th>Tarih/Saat</th><th>Personel</th><th>Eksik KKD</th><th>Durum</th></tr>
+          </thead>
+          <tbody>
+            {% for v in ppe_violations %}
+              <tr>
+                <td class="text-sm">{{ v.timestamp.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td class="text-sm">{{ v.personnel.full_name if v.personnel else 'Bilinmeyen' }}</td>
+                <td>
+                  {% for item in v.missing_ppe %}
+                    <span class="badge badge-danger" style="font-size:10px">✗ {{ item }}</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if v.is_resolved %}<span class="badge badge-success">Çözüldü</span>
+                  {% else %}<span class="badge badge-danger">Açık</span>{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state" style="padding:24px"><p>Bu tarih aralığında KKD ihlali yok.</p></div>
+    {% endif %}
+  </div>
+
+  <!-- Fall tab -->
+  <div id="tab-fall" class="tab-panel" style="display:none; padding-top:16px">
+    {% if fall_events %}
+      <div class="table-wrapper">
+        <table class="table">
+          <thead>
+            <tr><th>Tarih/Saat</th><th>Kamera</th><th>Güven</th><th>Medya</th><th>Durum</th></tr>
+          </thead>
+          <tbody>
+            {% for e in fall_events %}
+              <tr>
+                <td class="text-sm">{{ e.timestamp.strftime('%d.%m.%Y %H:%M:%S') }}</td>
+                <td class="text-sm">{{ e.camera.name if e.camera else '—' }}</td>
+                <td class="text-sm">{{ '%.0f%%' % (e.confidence * 100) if e.confidence else '—' }}</td>
+                <td>
+                  {% if e.image_path %}
+                    <a href="{{ url_for('static', filename=e.image_path) }}" target="_blank" class="btn btn-outline btn-sm">📷</a>
+                  {% endif %}
+                  {% if e.video_path %}
+                    <a href="{{ url_for('static', filename=e.video_path) }}" target="_blank" class="btn btn-outline btn-sm">🎬</a>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if e.is_resolved %}<span class="badge badge-success">Çözüldü</span>
+                  {% else %}<span class="badge badge-danger">Açık</span>{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state" style="padding:24px"><p>Bu tarih aralığında düşme olayı yok.</p></div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showReportTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.style.color = 'var(--text-muted)';
+    b.style.borderBottomColor = 'transparent';
+  });
+  document.getElementById(id).style.display = 'block';
+  btn.style.color = 'var(--accent)';
+  btn.style.borderBottomColor = 'var(--accent)';
+}
+
+// Daily entry chart
+const ctx = document.getElementById('dailyEntryChart');
+const dailyData = {{ daily_entries | tojson }};
+if (ctx && dailyData.length) {
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dailyData.map(d => d.date),
+      datasets: [{
+        label: 'Giriş Sayısı',
+        data: dailyData.map(d => d.count),
+        borderColor: 'rgba(59,130,246,1)',
+        backgroundColor: 'rgba(59,130,246,.1)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 3,
+        pointBackgroundColor: 'rgba(59,130,246,1)',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          grid: { color:'rgba(255,255,255,.05)' },
+          ticks: { color:'#9ca3af', maxTicksLimit:8 }
+        },
+        y: {
+          grid: { color:'rgba(255,255,255,.05)' },
+          ticks: { color:'#9ca3af', stepSize:1 }, min:0
+        }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

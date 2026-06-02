@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+{% block title %}{{ p.full_name }}{% endblock %}
+{% block page_title %}{{ p.full_name }}{% endblock %}
+{% block page_subtitle %}{{ p.personnel_id }} — {{ p.job_title or 'Görev belirtilmemiş' }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>👷 {{ p.full_name }}</h1>
+    <p>{{ p.job_title or '' }}{% if p.work_area %} · {{ p.work_area }}{% endif %}</p>
+  </div>
+  <div class="page-header-actions">
+    {% if p.is_on_site %}
+      <form method="POST" action="{{ url_for('personnel.checkout', pid=p.id) }}" style="display:inline">
+        <button class="btn btn-warning" data-confirm="{{ p.full_name }} sahasından çıkarılsın mı?">
+          🚪 Çıkış Yaptır
+        </button>
+      </form>
+    {% endif %}
+    <button class="btn btn-primary" onclick="openModal('edit-modal')">✏️ Düzenle</button>
+    <a href="{{ url_for('personnel.index') }}" class="btn btn-secondary">← Geri</a>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-bottom:20px">
+
+  <!-- Profile card -->
+  <div class="card">
+    <div style="text-align:center; padding:16px 0">
+      <div class="personnel-avatar" style="width:90px;height:90px;font-size:32px;margin:0 auto 12px;border-radius:16px">
+        {% if p.photo_path %}
+          <img src="{{ url_for('static', filename=p.photo_path) }}" alt="{{ p.full_name }}">
+        {% else %}
+          {{ p.first_name[0] }}{{ p.last_name[0] }}
+        {% endif %}
+      </div>
+      <div style="font-size:18px; font-weight:700">{{ p.full_name }}</div>
+      <div style="color:var(--text-muted); font-size:13px; margin-top:4px">{{ p.job_title or '' }}</div>
+      <div style="margin-top:10px; display:flex; justify-content:center; gap:8px; flex-wrap:wrap">
+        <span class="badge badge-accent">{{ p.personnel_id }}</span>
+        {% if not p.is_active %}
+          <span class="badge badge-secondary">Pasif</span>
+        {% elif p.is_on_site %}
+          <span class="badge badge-success"><span class="badge-dot"></span> Sahada</span>
+        {% else %}
+          <span class="badge badge-warning">Dışarıda</span>
+        {% endif %}
+        {% if p.face_encoding %}
+          <span class="badge badge-info">🤖 Yüz Kayıtlı</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="separator"></div>
+    <div style="font-size:13px">
+      {% if p.work_area %}
+        <div class="flex gap-2 mb-2"><span style="color:var(--text-muted)">📍 Alan:</span><span>{{ p.work_area }}</span></div>
+      {% endif %}
+      {% if p.phone %}
+        <div class="flex gap-2 mb-2"><span style="color:var(--text-muted)">📞 Tel:</span><span>{{ p.phone }}</span></div>
+      {% endif %}
+      {% if p.email %}
+        <div class="flex gap-2 mb-2"><span style="color:var(--text-muted)">✉️ E-posta:</span><span>{{ p.email }}</span></div>
+      {% endif %}
+      <div class="flex gap-2"><span style="color:var(--text-muted)">📅 Eklenme:</span><span>{{ p.created_at.strftime('%d.%m.%Y') }}</span></div>
+    </div>
+    <div class="separator"></div>
+    <form method="POST" action="{{ url_for('personnel.toggle_active', pid=p.id) }}">
+      <button type="submit" class="btn {% if p.is_active %}btn-secondary{% else %}btn-success{% endif %} w-full"
+              style="width:100%; justify-content:center"
+              data-confirm="Personelin durumu değiştirilsin mi?">
+        {% if p.is_active %}🔒 Pasife Al{% else %}✅ Aktif Et{% endif %}
+      </button>
+    </form>
+  </div>
+
+  <!-- Stats + PPE -->
+  <div class="card col-span-2">
+    <!-- Stats row -->
+    <div class="grid grid-3" style="margin-bottom:16px">
+      <div class="stat-card accent" style="padding:14px">
+        <div class="stat-icon" style="width:36px;height:36px;font-size:16px">📅</div>
+        <div class="stat-value" style="font-size:22px">{{ ppe_stats.total_days }}</div>
+        <div class="stat-label">Toplam Gün</div>
+      </div>
+      <div class="stat-card warning" style="padding:14px">
+        <div class="stat-icon" style="width:36px;height:36px;font-size:16px">⚠️</div>
+        <div class="stat-value" style="font-size:22px">{{ ppe_stats.total_violations }}</div>
+        <div class="stat-label">Toplam İhlal</div>
+      </div>
+      <div class="stat-card danger" style="padding:14px">
+        <div class="stat-icon" style="width:36px;height:36px;font-size:16px">🚨</div>
+        <div class="stat-value" style="font-size:22px">{{ ppe_stats.unresolved }}</div>
+        <div class="stat-label">Açık İhlal</div>
+      </div>
+    </div>
+
+    <!-- Required PPE -->
+    <div class="card-header"><div class="card-title">Zorunlu KKD Ekipmanları</div></div>
+    {% if p.required_ppe %}
+      <div class="ppe-status-row" style="margin-bottom:16px">
+        {% for ppe in p.required_ppe %}
+          <span class="ppe-item present">✓ {{ ppe }}</span>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-muted text-sm" style="margin-bottom:16px">KKD gereksinimi tanımlanmamış.</p>
+    {% endif %}
+
+    <!-- Today's status -->
+    <div class="card-header"><div class="card-title">Bugünkü Durum</div></div>
+    {% if today_log %}
+      <div class="alert alert-success">
+        <span>✅</span>
+        <span class="alert-msg">Bugün {{ today_log.entry_time.strftime('%H:%M') }} saatinde giriş yaptı.</span>
+      </div>
+    {% else %}
+      <div class="alert alert-warning">
+        <span>⚠️</span>
+        <span class="alert-msg">Bugün henüz giriş kaydı yok.</span>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Attendance log + PPE violations tabs -->
+<div class="card">
+  <div style="display:flex; gap:0; border-bottom:1px solid var(--border); margin:-20px -20px 0">
+    <button class="tab-btn active" onclick="showTab('tab-attendance', this)"
+            style="padding:12px 20px; background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--accent); border-bottom:2px solid var(--accent)">
+      📋 Giriş/Çıkış Geçmişi
+    </button>
+    <button class="tab-btn" onclick="showTab('tab-violations', this)"
+            style="padding:12px 20px; background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--text-muted); border-bottom:2px solid transparent">
+      ⚠️ KKD İhlalleri
+    </button>
+  </div>
+
+  <!-- Attendance tab -->
+  <div id="tab-attendance" class="tab-panel" style="padding-top:16px">
+    {% if recent_logs %}
+      <div class="table-wrapper">
+        <table class="table">
+          <thead>
+            <tr><th>Tarih</th><th>Giriş</th><th>Çıkış</th><th>Süre</th><th>Yöntem</th></tr>
+          </thead>
+          <tbody>
+            {% for log in recent_logs %}
+              <tr>
+                <td class="text-sm">{{ log.entry_time.strftime('%d.%m.%Y') }}</td>
+                <td class="text-sm">{{ log.entry_time.strftime('%H:%M:%S') }}</td>
+                <td class="text-sm">{{ log.exit_time.strftime('%H:%M:%S') if log.exit_time else '—' }}</td>
+                <td class="text-sm">{{ log.duration_hours ~ ' sa' if log.duration_hours else '—' }}</td>
+                <td><span class="badge badge-info" style="font-size:10px">{{ log.method }}</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state"><div class="empty-icon">📋</div><p>Kayıt bulunamadı.</p></div>
+    {% endif %}
+  </div>
+
+  <!-- Violations tab -->
+  <div id="tab-violations" class="tab-panel" style="display:none; padding-top:16px">
+    {% if recent_violations %}
+      <div class="table-wrapper">
+        <table class="table">
+          <thead>
+            <tr><th>Tarih/Saat</th><th>Eksik KKD</th><th>Tespit Edilen</th><th>Durum</th></tr>
+          </thead>
+          <tbody>
+            {% for v in recent_violations %}
+              <tr>
+                <td class="text-sm">{{ v.timestamp.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td>
+                  {% for item in v.missing_ppe %}
+                    <span class="ppe-item missing" style="font-size:11px">✗ {{ item }}</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% for item in v.detected_ppe %}
+                    <span class="ppe-item present" style="font-size:11px">✓ {{ item }}</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if v.is_resolved %}
+                    <span class="badge badge-success">Çözüldü</span>
+                  {% else %}
+                    <span class="badge badge-danger">Açık</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state"><div class="empty-icon">✅</div><p>KKD ihlali kaydı yok.</p></div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>✏️ Personel Düzenle</h3>
+      <button onclick="closeModal('edit-modal')" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted)">×</button>
+    </div>
+    <form method="POST" action="{{ url_for('personnel.edit', pid=p.id) }}" enctype="multipart/form-data">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Ad</label>
+            <input type="text" name="first_name" class="form-control" value="{{ p.first_name }}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Soyad</label>
+            <input type="text" name="last_name" class="form-control" value="{{ p.last_name }}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Görev</label>
+            <input type="text" name="job_title" class="form-control" value="{{ p.job_title or '' }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Çalışma Alanı</label>
+            <input type="text" name="work_area" class="form-control" value="{{ p.work_area or '' }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fotoğraf (yeni yüklemek için)</label>
+          <input type="file" name="photo" class="form-control" accept="image/*">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Zorunlu KKD</label>
+          <div class="ppe-grid">
+            {% for value, label in ppe_options %}
+              <label class="ppe-checkbox">
+                <input type="checkbox" name="required_ppe" value="{{ value }}"
+                       {% if value in p.required_ppe %}checked{% endif %}>
+                <span>{{ label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="closeModal('edit-modal')" class="btn btn-secondary">İptal</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.style.color = 'var(--text-muted)';
+    b.style.borderBottomColor = 'transparent';
+  });
+  document.getElementById(id).style.display = 'block';
+  btn.style.color = 'var(--accent)';
+  btn.style.borderBottomColor = 'var(--accent)';
+}
+</script>
+{% endblock %}
